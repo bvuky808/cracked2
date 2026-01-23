@@ -1,53 +1,76 @@
-using UnityEngine;
 using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
 
 public class FallingPlatform : MonoBehaviour
 {
-    private Rigidbody2D rb;
-
     [Header("Settings")]
-    public float fallDelay = 0.5f;      // Jak dlouho èekat, ne spadne
-    public float destroyDelay = 2f;     // Za jak dlouho po pádu zmizí úplnì (úklid)
+    public float fallDelay = 0.5f;    // Jak dlouho se klepe, ne zmizí
+    public float respawnDelay = 2f;   // Za jak dlouho se vrátí
+    public GameObject destroyEffect;  // Sem dej ten stejnı efekt jako na zeï!
 
-    private bool falling = false;
+    [Header("Components")]
+    private BoxCollider2D boxCollider;
+    private SpriteRenderer spriteRenderer;
+
+    private Vector3 originalPos;
+    private bool isFalling = false;
 
     void Start()
     {
-        rb = GetComponent<Rigidbody2D>();
-        // DÙLEITÉ: Plošina musí zaèít jako Kinematic, aby nepadala hned!
-        rb.bodyType = RigidbodyType2D.Kinematic;
+        boxCollider = GetComponent<BoxCollider2D>();
+        spriteRenderer = GetComponent<SpriteRenderer>();
+        originalPos = transform.position;
     }
 
     private void OnCollisionEnter2D(Collision2D collision)
     {
-        // Kontrolujeme, jestli do nás narazil Hráè a jestli u nepadáme
-        // Je nutné, aby tvùj hráè mìl v Unity nastavenı Tag "Player"!
-        if (collision.gameObject.CompareTag("Player") && !falling)
+        // Reaguje jen na hráèe a pokud u nepadá
+        // Poznámka: Hráè se musí dotknout shora (kontrolujeme pøes kolizi)
+        if (collision.gameObject.CompareTag("Player") && !isFalling)
         {
-            // Kontrola, zda hráè dopadl SHORA (nechceme aby spadla, kdy do ní drcneš hlavou zespodu)
-            // Pokud je hráèova Y pozice vyšší ne plošiny, tak stojí na ní.
+            // Kontrola, e hráè je nad plošinou (aby nespadla, kdy do ní drcneš hlavou)
             if (collision.transform.position.y > transform.position.y)
             {
-                StartCoroutine(Fall());
+                StartCoroutine(FallSequence());
             }
         }
     }
 
-    private IEnumerator Fall()
+    private IEnumerator FallSequence()
     {
-        falling = true;
+        isFalling = true;
+        float timer = 0f;
 
-        // Tady by se mohla plošina chvilku tøepat (animace), zatím jen èekáme
-        yield return new WaitForSeconds(fallDelay);
+        // FÁZE 1: Klepání (Varování)
+        while (timer < fallDelay)
+        {
+            float x = Random.Range(-0.05f, 0.05f); // Jemné klepání do stran
+            transform.position = originalPos + new Vector3(x, 0, 0);
 
-        // Zmìníme typ na Dynamic -> Unity zapne gravitaci a plošina spadne
-        rb.bodyType = RigidbodyType2D.Dynamic;
-        rb.gravityScale = 2f; // Mùeš zvıšit, aby padala rychleji
+            timer += Time.deltaTime;
+            yield return null;
+        }
 
-        // Volitelné: Vypneme kolize s ostatními vìcmi, aby propadla podlahou pryè
-        // GetComponent<BoxCollider2D>().isTrigger = true; 
+        // Vrátíme na støed, aby nebyla posunutá
+        transform.position = originalPos;
 
-        // Úklid - znièení objektu po chvíli, a nezatìuje hru, kdy padá do nekoneèna
-        Destroy(gameObject, destroyDelay);
+        // FÁZE 2: Vıbuch a Zmizení
+        if (destroyEffect != null)
+        {
+            Instantiate(destroyEffect, transform.position, Quaternion.identity);
+        }
+
+        // Místo znièení objektu ho jen "vypneme" (neviditelnı + nehmotnı)
+        spriteRenderer.enabled = false;
+        boxCollider.enabled = false;
+
+        // FÁZE 3: Èekání na Respawn
+        yield return new WaitForSeconds(respawnDelay);
+
+        // FÁZE 4: Návrat
+        spriteRenderer.enabled = true;
+        boxCollider.enabled = true;
+        isFalling = false;
     }
 }

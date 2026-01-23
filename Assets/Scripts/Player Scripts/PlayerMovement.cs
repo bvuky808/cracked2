@@ -7,6 +7,8 @@ public class PlayerMovement : MonoBehaviour
     [Header("Settings")]
     public LayerMask groundLayer;
     public LayerMask wallLayer;
+    // --- NOVÉ: Vrstva pro prùchozí plošinky ---
+    public LayerMask oneWayPlatformLayer;
 
     [Header("References")]
     public Rigidbody2D body;
@@ -35,6 +37,9 @@ public class PlayerMovement : MonoBehaviour
 
     private bool canDash = true;
     private bool isDashing;
+
+    // --- NOVÉ: Promìnná pro plošinku, na které stojíme ---
+    private GameObject currentOneWayPlatform;
 
     void Update()
     {
@@ -66,6 +71,13 @@ public class PlayerMovement : MonoBehaviour
         {
             StartCoroutine(Dash());
             return;
+        }
+
+        // --- NOVÉ: PROPADNUTÍ DOLÙ (Terraria Style) ---
+        // Pokud držíš šipku dolù a stojíš na prùchozí plošince
+        if (Input.GetAxis("Vertical") < -0.5f && currentOneWayPlatform != null)
+        {
+            StartCoroutine(DisableCollision());
         }
 
         // pohyb a jump
@@ -152,16 +164,6 @@ public class PlayerMovement : MonoBehaviour
         // dash nahoru nejde
         Vector2 dashDir = new Vector2(dashDirectionX, 0);
 
-        /*
-        Vector2 dashDir = new Vector2(Input.GetAxisRaw("Horizontal"), Input.GetAxisRaw("Vertical"));
-
-        if (dashDir == Vector2.zero)
-        {
-            dashDir = new Vector2(Mathf.Sign(transform.localScale.x), 0);
-        }
-        */
-
-
         body.velocity = dashDir.normalized * dashingPower;
 
         // trail on
@@ -195,5 +197,45 @@ public class PlayerMovement : MonoBehaviour
     public bool canAttack()
     {
         return horizontalInput == 0 && isGrounded() && !onWall();
+    }
+
+    // --- NOVÉ FUNKCE PRO ONE WAY PLATFORM ---
+
+    private void OnCollisionEnter2D(Collision2D collision)
+    {
+        // Kontrola, jestli jsme stoupli na vrstvu OneWayPlatform
+        if (isInLayerMask(collision.gameObject.layer, oneWayPlatformLayer))
+        {
+            currentOneWayPlatform = collision.gameObject;
+        }
+    }
+
+    private void OnCollisionExit2D(Collision2D collision)
+    {
+        // Kontrola, jestli jsme odešli z vrstvy OneWayPlatform
+        if (isInLayerMask(collision.gameObject.layer, oneWayPlatformLayer))
+        {
+            currentOneWayPlatform = null;
+        }
+    }
+
+    private IEnumerator DisableCollision()
+    {
+        BoxCollider2D platformCollider = currentOneWayPlatform.GetComponent<BoxCollider2D>();
+
+        // Vypneme kolizi mezi hráèem a plošinou
+        Physics2D.IgnoreCollision(boxCollider, platformCollider);
+
+        // Èekáme, než propadne
+        yield return new WaitForSeconds(0.5f);
+
+        // Zapneme kolizi zpátky
+        Physics2D.IgnoreCollision(boxCollider, platformCollider, false);
+    }
+
+    // Pomocná funkce pro zjištìní, jestli je layer souèástí LayerMasky
+    private bool isInLayerMask(int layer, LayerMask mask)
+    {
+        return (mask == (mask | (1 << layer)));
     }
 }
