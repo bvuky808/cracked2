@@ -1,6 +1,8 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+// Pøidáno pro jistotu, kdyby UI manager selhal, ale primárnì to øeší tvùj UIManager
+using UnityEngine.SceneManagement;
 
 public class Health : MonoBehaviour
 {
@@ -14,6 +16,9 @@ public class Health : MonoBehaviour
     public SpriteRenderer spriteRend;
     private PlayerMovement movementScript;
     private Rigidbody2D rb;
+
+    // PØIDÁNO: Odkaz na tvùj UI Manager
+    private UIManager uiManager;
 
     [Header("iFrames Settings")]
     public float iFramesDuration = 1f;
@@ -38,13 +43,8 @@ public class Health : MonoBehaviour
         // Na zaèátku je bezpeèná pozice tam, kde zaèínáš
         lastSafePos = transform.position;
 
-        // Pojistka: Pokud jsi zapomnìl nastavit Main Checkpoint, vytvoøíme ho na startu
-        if (mainCheckpoint == null)
-        {
-            GameObject startPoint = new GameObject("StartPoint");
-            startPoint.transform.position = transform.position;
-            mainCheckpoint = startPoint.transform;
-        }
+        // PØIDÁNO: Najdeme tvùj UIManager ve scénì
+        uiManager = FindObjectOfType<UIManager>();
     }
 
     void Update()
@@ -59,8 +59,7 @@ public class Health : MonoBehaviour
                 // Pøièítáme èas, jak dlouho už stojíme
                 safeTimeCooldown += Time.deltaTime;
 
-                // Teprve když stojíme na zemi déle než 0.2 vteøiny, uložíme pozici
-                // To zabrání uložení pozice, když jen škrtneš o kraj pøi pádu
+                // Teprve když stojíme na zemi déle než 0.1 vteøiny, uložíme pozici
                 if (safeTimeCooldown > 0.1f)
                 {
                     lastSafePos = transform.position;
@@ -78,12 +77,8 @@ public class Health : MonoBehaviour
     {
         if (movementScript == null) return false;
 
-        // TOTO JE NOVÉ: Vykreslí èervenou èáru ve Scene oknì
-        // Vidíš tak pøesnì, kam až paprsek sahá
-        Debug.DrawRay(transform.position, Vector2.down * 2.5f, Color.red);
-
-        // Zvìtšil jsem dosah z 1.5 na 2.5, aby to s jistotou dosáhlo na zem
-        return Physics2D.Raycast(transform.position, Vector2.down, 2.5f, movementScript.groundLayer);
+        // Zkrat délku z 2.5f na tøeba 1.2f nebo 1.5f
+        return Physics2D.Raycast(transform.position, Vector2.down, 1.2f, movementScript.groundLayer);
     }
 
     // --- HLAVNÍ FUNKCE PRO ZRANÌNÍ ---
@@ -156,26 +151,41 @@ public class Health : MonoBehaviour
         Physics2D.IgnoreLayerCollision(10, 11, false);
     }
 
-    // respqn na konci animace die
+    // Tuto funkci volá Animation Event na konci animace smrti
     public void Respawn()
     {
-        dead = false;
-        AddHealth(startingHealth);
-        anim.ResetTrigger("die");
-        anim.Play("Idle");
-
-        // Zapneme zpátky fyziku a pohyb
-        rb.bodyType = RigidbodyType2D.Dynamic;
-        if (movementScript != null) movementScript.enabled = true;
-
-        // --- HARD RESPAWN: Návrat k LAVIÈCE ---
+        // SCÉNÁØ A: MÁME AKTIVNÍ LAVIÈKU -> Oživíme hráèe
         if (mainCheckpoint != null)
         {
+            dead = false;
+            AddHealth(startingHealth);
+            anim.ResetTrigger("die");
+            anim.Play("Idle");
+
+            // Zapneme zpátky fyziku a pohyb
+            rb.bodyType = RigidbodyType2D.Dynamic;
+            if (movementScript != null) movementScript.enabled = true;
+
+            // Teleport na lavièku
             transform.position = mainCheckpoint.position;
             lastSafePos = mainCheckpoint.position; // Resetujeme i bezpeènou pozici
-        }
 
-        StartCoroutine(Invulnerability());
+            StartCoroutine(Invulnerability());
+        }
+        // SCÉNÁØ B: NEMÁME LAVIÈKU -> GAME OVER OBRAZOVKA
+        else
+        {
+            Debug.Log("Game Over! Volám UI Manager.");
+            if (uiManager != null)
+            {
+                uiManager.GameOver(); // <--- Tady se zapne tvoje Game Over obrazovka
+            }
+            else
+            {
+                // Pojistka, kdyby UI manager nebyl nalezen
+                SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+            }
+        }
     }
 
     // Pro Lavièky (Save System)

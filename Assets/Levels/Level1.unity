@@ -5175,10 +5175,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b1fdae85a27f94d49af29318af42645f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  speed: 0.5
   player: {fileID: 2003497158}
   aheadDistance: 3.5
-  cameraSpeed: 1.2
+  lookAheadSpeed: 2
+  yOffset: 0.5
+  fallOffset: -2
+  fallThreshold: -5
+  smoothTime: 0.2
 --- !u!1 &556137595
 GameObject:
   m_ObjectHideFlags: 0
@@ -11686,7 +11689,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!224 &1269934594
 RectTransform:
   m_ObjectHideFlags: 0

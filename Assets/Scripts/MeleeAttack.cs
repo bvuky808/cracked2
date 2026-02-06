@@ -34,21 +34,24 @@ public class PlayerCombat : MonoBehaviour
     // Musí být PUBLIC, aby ji Event vidìl.
     public void DealDamage()
     {
-        Debug.Log("POKUS O ÚTOK!");
-        // Detekovat vše v dosahu
         Collider2D[] hitObjects = Physics2D.OverlapCircleAll(attackPoint.position, attackRange, enemyLayers);
 
-        // Poškodit
         foreach (Collider2D obj in hitObjects)
         {
+            // Zdi (beze zmìny)
             DestructibleWall wall = obj.GetComponent<DestructibleWall>();
             if (wall != null)
             {
                 wall.TakeDamage(attackDamage);
             }
 
-            // Debug pro kontrolu
-            Debug.Log("Zásah v pøesný moment: " + obj.name);
+            // Nepøátelé
+            EnemyHealth enemy = obj.GetComponent<EnemyHealth>();
+            if (enemy != null)
+            {
+                // ZMÌNA: Posíláme 'transform' (sebe) jako druhý parametr!
+                enemy.TakeDamage(attackDamage, transform);
+            }
         }
     }
 
