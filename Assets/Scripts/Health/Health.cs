@@ -17,7 +17,6 @@ public class Health : MonoBehaviour
     private PlayerMovement movementScript;
     private Rigidbody2D rb;
 
-    // PØIDÁNO: Odkaz na tvùj UI Manager
     private UIManager uiManager;
 
     [Header("iFrames Settings")]
@@ -25,12 +24,11 @@ public class Health : MonoBehaviour
     public float numberOfFlashes = 3f;
 
     [Header("Respawn & Checkpoints")]
-    // HLAVNÍ CHECKPOINT (Lavièka/Start) - sem jdeš, kdy umøeš úplnì
     public Transform mainCheckpoint;
 
-    // POSLEDNÍ BEZPEÈNÁ POZICE - sem jdeš, kdy spadneš do hrotù (Soft Respawn)
+    // POSLEDNÍ BEZPEÈNÁ POZICE 
     private Vector3 lastSafePos;
-    private float safeTimeCooldown; // Èasovaè, abychom neukládali pozici na kraji propasti
+    private float safeTimeCooldown;
 
     void Awake()
     {
@@ -40,26 +38,23 @@ public class Health : MonoBehaviour
         movementScript = GetComponent<PlayerMovement>();
         rb = GetComponent<Rigidbody2D>();
 
-        // Na zaèátku je bezpeèná pozice tam, kde zaèínáš
         lastSafePos = transform.position;
 
-        // PØIDÁNO: Najdeme tvùj UIManager ve scénì
         uiManager = FindObjectOfType<UIManager>();
     }
 
     void Update()
     {
         // LOGIKA PRO UKLÁDÁNÍ BEZPEÈNÉ POZICE
-        // Pokud ijeme a máme script pro pohyb
         if (movementScript != null && !dead)
         {
-            // Kontrola: Stojíme pevnì na zemi?
+            //  pevnì na zemi?
             if (IsGroundedCheck())
             {
-                // Pøièítáme èas, jak dlouho u stojíme
+                // pøièítáme èas, jak dlouho u stojíme
                 safeTimeCooldown += Time.deltaTime;
 
-                // Teprve kdy stojíme na zemi déle ne 0.1 vteøiny, uloíme pozici
+                // teprve kdy stojíme na zemi déle ne 0.1 vteøiny uloíme pozici
                 if (safeTimeCooldown > 0.1f)
                 {
                     lastSafePos = transform.position;
@@ -67,7 +62,7 @@ public class Health : MonoBehaviour
             }
             else
             {
-                // Jsme ve vzduchu -> resetujeme èasovaè
+                // resetujeme èasovaè
                 safeTimeCooldown = 0f;
             }
         }
@@ -77,19 +72,17 @@ public class Health : MonoBehaviour
     {
         if (movementScript == null) return false;
 
-        // Zkrat délku z 2.5f na tøeba 1.2f nebo 1.5f
         return Physics2D.Raycast(transform.position, Vector2.down, 1.2f, movementScript.groundLayer);
     }
 
     // --- HLAVNÍ FUNKCE PRO ZRANÌNÍ ---
     public void TakeDamage(float _damage)
     {
-        // Odeèteme ivoty, ale nejdeme pod nulu
+        // odeèteme ivoty, ale nejdeme pod nulu
         currentHealth = Mathf.Clamp(currentHealth - _damage, 0, startingHealth);
 
         if (currentHealth > 0)
         {
-            // Zranìní, ale ijeme
             anim.SetTrigger("hurt");
             StartCoroutine(Invulnerability());
         }
@@ -106,16 +99,16 @@ public class Health : MonoBehaviour
     // --- TOTO VOLAJÍ HROTY A PILY (Soft Respawn) ---
     public void TakeHazardDamage(float _damage)
     {
-        // 1. Ubere ivot (spustí blikání atd.)
+        // 1. ubere ivot
         TakeDamage(_damage);
 
-        // 2. Pokud stále ijeme, vrátíme se na POSLEDNÍ PEVNOU ZEM
+        // 2.pokud stále ijeme, vrátíme se na POSLEDNÍ PEVNOU ZEM
         if (!dead)
         {
             transform.position = lastSafePos;
-            rb.velocity = Vector2.zero; // Zastavíme setrvaènost, a nevylétneš
+            rb.velocity = Vector2.zero; // zastavíme setrvaènost, a nevylétneš
         }
-        // Pokud jsme umøeli (HP=0), funkce TakeDamage u zavolala Die()
+        // pokud jsme umøeli (HP=0), funkce TakeDamage u zavolala Die()
     }
 
     private void Die()
@@ -123,7 +116,7 @@ public class Health : MonoBehaviour
         dead = true;
         anim.SetTrigger("die");
 
-        // Vypneme ovládání a fyziku
+        // vypneme ovládání a fyziku
         if (movementScript != null) movementScript.enabled = false;
         rb.velocity = Vector2.zero;
         rb.bodyType = RigidbodyType2D.Static;
@@ -137,24 +130,23 @@ public class Health : MonoBehaviour
     // IEnumerator pro blikáni pøi respqnu, 
     private IEnumerator Invulnerability()
     {
-        // DÙLEITÉ: Zkontroluj èísla vrstev (10=Player, 11=Enemy/Hazard)
         Physics2D.IgnoreLayerCollision(10, 11, true);
 
         for (int i = 0; i < numberOfFlashes; i++)
         {
-            spriteRend.color = new Color(1, 0, 0, 0.5f); // Èervená poloprùhledná
+            spriteRend.color = new Color(1, 0, 0, 0.5f); // èervená poloprùhledná
             yield return new WaitForSeconds(iFramesDuration / (numberOfFlashes * 2));
-            spriteRend.color = Color.white; // Normální
+            spriteRend.color = Color.white; // normální
             yield return new WaitForSeconds(iFramesDuration / (numberOfFlashes * 2));
         }
 
         Physics2D.IgnoreLayerCollision(10, 11, false);
     }
 
-    // Tuto funkci volá Animation Event na konci animace smrti
+    // tuto funkci volá Animation Event na konci animace smrti
     public void Respawn()
     {
-        // SCÉNÁØ A: MÁME AKTIVNÍ LAVIÈKU -> Oivíme hráèe
+        // A: MÁME AKTIVNÍ LAVIÈKU oivíme hráèe
         if (mainCheckpoint != null)
         {
             dead = false;
@@ -162,33 +154,31 @@ public class Health : MonoBehaviour
             anim.ResetTrigger("die");
             anim.Play("Idle");
 
-            // Zapneme zpátky fyziku a pohyb
             rb.bodyType = RigidbodyType2D.Dynamic;
             if (movementScript != null) movementScript.enabled = true;
 
-            // Teleport na lavièku
             transform.position = mainCheckpoint.position;
-            lastSafePos = mainCheckpoint.position; // Resetujeme i bezpeènou pozici
+            lastSafePos = mainCheckpoint.position; // resetujeme i bezpeènou pozici
 
             StartCoroutine(Invulnerability());
         }
-        // SCÉNÁØ B: NEMÁME LAVIÈKU -> GAME OVER OBRAZOVKA
+        // B: NEMÁME LAVIÈKU GAME OVER OBRAZOVKA
         else
         {
             Debug.Log("Game Over! Volám UI Manager.");
             if (uiManager != null)
             {
-                uiManager.GameOver(); // <--- Tady se zapne tvoje Game Over obrazovka
+                uiManager.GameOver();
             }
             else
             {
-                // Pojistka, kdyby UI manager nebyl nalezen
+                // kdyby UI manager nebyl nalezen
                 SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
             }
         }
     }
 
-    // Pro Lavièky (Save System)
+    //(Save System)
     public void SetCheckpoint(Transform newPoint)
     {
         mainCheckpoint = newPoint;

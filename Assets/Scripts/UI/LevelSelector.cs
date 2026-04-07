@@ -19,18 +19,26 @@ public class LevelSelector : MonoBehaviour
 
 
 
-
+    public void BaseNothing()
+    {
+        SceneManager.LoadScene("BASE_nothing");
+    }
     public void Level1()
     {
-        SceneManager.LoadScene("Level1");
+        SceneManager.LoadScene("Level_1");
     }
     public void Level2()
     {
-        SceneManager.LoadScene("Level2");
+        SceneManager.LoadScene("Level_2");
     }
     public void Level3()
     {
-        SceneManager.LoadScene("Level3");
+        SceneManager.LoadScene("Level_3");
+    }
+
+    public void LevelFinal()
+    {
+        SceneManager.LoadScene("Level_Final");
     }
 
     public void LevelSelect()

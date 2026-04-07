@@ -7,7 +7,6 @@ public class PlayerMovement : MonoBehaviour
     [Header("Settings")]
     public LayerMask groundLayer;
     public LayerMask wallLayer;
-    // --- NOVÉ: Vrstva pro prùchozí plošinky ---
     public LayerMask oneWayPlatformLayer;
 
     [Header("References")]
@@ -16,20 +15,41 @@ public class PlayerMovement : MonoBehaviour
     public BoxCollider2D boxCollider;
     public TrailRenderer tr;
 
+    [Header("Roll (Kulièka)")]
+    public SpriteRenderer spriteRenderer; 
+    public Sprite rollSprite; 
+    private Sprite normalSprite; 
+    private Vector3 normalVisualScale = new Vector3(0.8f, 0.8f, 0.8f);
+    public float rollVisualScaleMultiplier = 0.5f;
+
+    
+    public Vector2 rollColliderSize = new Vector2(0.5f, 0.5f);
+    public Vector2 rollColliderOffset = new Vector2(0f, -0.25f);
+
+   
+    private Vector2 normalColliderSize;
+    private Vector2 normalColliderOffset;
+
+    public bool isRolling { get; private set; } = false; // veøejné, aby to vidìl PlayerCombat
+    // ------------------------------------
+
     [Header("Movement Stats")]
     public float moveSpeed = 10f;
     public float jumpPower = 15f;
 
     [Header("Double Jump Settings")]
-    public bool doubleJumpUnlocked = true;
     public int extraJumpsValue = 1;
     private int extraJumps;
 
     [Header("Dash Settings")]
-    public bool dashUnlocked = true;
     public float dashingPower = 24f;
     public float dashingTime = 0.2f;
     public float dashingCooldown = 1f;
+
+    [Header("Abilities unlock")]
+    public bool dashUnlocked = false;
+    public bool doubleJumpUnlocked = false;
+    public bool rollUnlocked = false;
 
     private float wallJumpCooldown;
     private float horizontalInput;
@@ -38,8 +58,15 @@ public class PlayerMovement : MonoBehaviour
     private bool canDash = true;
     private bool isDashing;
 
-    // --- NOVÉ: Promìnná pro plošinku, na které stojíme ---
     private GameObject currentOneWayPlatform;
+
+    void Start()
+    {
+       
+        if (spriteRenderer != null) normalSprite = spriteRenderer.sprite;
+        normalColliderSize = boxCollider.size;
+        normalColliderOffset = boxCollider.offset;
+    }
 
     void Update()
     {
@@ -48,33 +75,55 @@ public class PlayerMovement : MonoBehaviour
         horizontalInput = Input.GetAxis("Horizontal");
         verticalInput = Input.GetAxis("Vertical");
 
-        // otáèení spritù
+      
+        Vector3 currentScale = isRolling ? (normalVisualScale * rollVisualScaleMultiplier) : normalVisualScale;
+
         if (horizontalInput > 0.01f)
-            transform.localScale = new Vector3(0.8f, 0.8f, 0.8f);
+            transform.localScale = new Vector3(currentScale.x, currentScale.y, currentScale.z);
         else if (horizontalInput < -0.01f)
-            transform.localScale = new Vector3(-0.8f, 0.8f, 0.8f);
+            transform.localScale = new Vector3(-currentScale.x, currentScale.y, currentScale.z);
+        // -------------------------------------------------
+
+        // 
+        if ((Input.GetKeyDown(KeyCode.C) || Input.GetKeyDown(KeyCode.LeftControl)) && rollUnlocked)
+        {
+            if (isRolling)
+            {
+                // musíme zkontrolovat strop
+                if (IsCeilingClear())
+                {
+                    StandUp();
+                }
+                else
+                {
+                    Debug.Log("Nemùžu se postavit, nad hlavou mám zeï!");
+                }
+            }
+            else
+            {
+                GoToBall();
+            }
+        }
+        // ---------------------------------------------------------
 
         // ANIMACE
-        animator.SetBool("Run", horizontalInput != 0);
+        if (!isRolling) animator.SetBool("Run", horizontalInput != 0);
         animator.SetBool("grounded", isGrounded());
 
         // reset dostupných jumpù
         if (isGrounded())
         {
             extraJumps = extraJumpsValue;
-
             if (tr != null) tr.emitting = false;
         }
 
-        // input na dash
-        if (Input.GetKeyDown(KeyCode.LeftShift) && canDash && dashUnlocked)
+        // input na dash (Zakázáno, když jsi kulièka)
+        if (Input.GetKeyDown(KeyCode.LeftShift) && canDash && dashUnlocked && !isRolling)
         {
             StartCoroutine(Dash());
             return;
         }
 
-        // --- NOVÉ: PROPADNUTÍ DOLÙ (Terraria Style) ---
-        // Pokud držíš šipku dolù a stojíš na prùchozí plošince
         if (Input.GetAxis("Vertical") < -0.5f && currentOneWayPlatform != null)
         {
             StartCoroutine(DisableCollision());
@@ -85,8 +134,8 @@ public class PlayerMovement : MonoBehaviour
         {
             body.velocity = new Vector2(horizontalInput * moveSpeed, body.velocity.y);
 
-            // wall slide
-            if (onWall() && !isGrounded())
+            // wall slide (Zakázáno, když jsi kulièka)
+            if (onWall() && !isGrounded() && !isRolling)
             {
                 body.gravityScale = 0;
                 body.velocity = Vector2.zero;
@@ -99,7 +148,7 @@ public class PlayerMovement : MonoBehaviour
             // jump input
             if (Input.GetKeyDown(KeyCode.Space))
             {
-                if (onWall() && !isGrounded())
+                if (onWall() && !isGrounded() && !isRolling)
                 {
                     WallJump();
                 }
@@ -107,7 +156,7 @@ public class PlayerMovement : MonoBehaviour
                 {
                     PerformJump();
                 }
-                else if (doubleJumpUnlocked && extraJumps > 0)
+                else if (doubleJumpUnlocked && extraJumps > 0 && !isRolling)
                 {
                     PerformJump();
                     extraJumps--;
@@ -120,11 +169,60 @@ public class PlayerMovement : MonoBehaviour
         }
     }
 
+    private void GoToBall()
+    {
+        isRolling = true;
+        animator.enabled = false;
+        if (spriteRenderer != null && rollSprite != null) spriteRenderer.sprite = rollSprite;
+
+        boxCollider.size = rollColliderSize;
+        boxCollider.offset = rollColliderOffset;
+
+        // zjistím kam se hráè kouká
+        float currentFlip = Mathf.Sign(transform.localScale.x);
+
+        // vypocitam nový, menší scale
+        Vector3 newBallScale = normalVisualScale * rollVisualScaleMultiplier;
+
+        // dáme menší scale, zachováme otáèení (flipped)
+        transform.localScale = new Vector3(newBallScale.x * currentFlip, newBallScale.y, newBallScale.z);
+    }
+
+    private void StandUp()
+    {
+        isRolling = false;
+        animator.enabled = true;
+        if (spriteRenderer != null) spriteRenderer.sprite = normalSprite;
+
+        boxCollider.size = normalColliderSize;
+        boxCollider.offset = normalColliderOffset;
+
+        transform.position = new Vector3(transform.position.x, transform.position.y + 0.2f, transform.position.z);
+
+        // zjistím kam je hráè otoèen
+        float currentFlip = Mathf.Sign(transform.localScale.x);
+
+        // vrátíme pùvodní scale
+        transform.localScale = new Vector3(normalVisualScale.x * currentFlip, normalVisualScale.y, normalVisualScale.z);
+        // --------------------------------------------------
+    }
+
+    private bool IsCeilingClear()
+    {
+        // vystøelí paprsek z aktuální pozice kulièky nahoru do výšky normálního hráèe
+        RaycastHit2D hit = Physics2D.Raycast(transform.position, Vector2.up, normalColliderSize.y, groundLayer | wallLayer);
+        // pokud paprsek prošel mùže se hráè postavit
+        return hit.collider == null;
+    }
+
+
     private void PerformJump()
     {
-        body.velocity = new Vector2(body.velocity.x, 0); //reset Y, plynulost d jumpu
+        body.velocity = new Vector2(body.velocity.x, 0);
         body.velocity = new Vector2(body.velocity.x, jumpPower);
-        animator.SetTrigger("jump");
+
+        // animace skoku se pøehraje jen, když nejsme kulièka
+        if (!isRolling) animator.SetTrigger("jump");
 
         if (tr != null) tr.emitting = true;
     }
@@ -140,7 +238,6 @@ public class PlayerMovement : MonoBehaviour
             body.velocity = new Vector2(-Mathf.Sign(transform.localScale.x) * 3, 6);
 
         wallJumpCooldown = 0;
-
         if (tr != null) tr.emitting = true;
     }
 
@@ -152,26 +249,14 @@ public class PlayerMovement : MonoBehaviour
         float originalGravity = body.gravityScale;
         body.gravityScale = 0f;
 
-        // ZMÌNA: Naèítáme pouze horizontální osu. Y nastavíme natvrdo na 0.
         float dashDirectionX = Input.GetAxisRaw("Horizontal");
+        if (dashDirectionX == 0) dashDirectionX = Mathf.Sign(transform.localScale.x);
 
-        // pokud nedržím šipku tak dashne tam kde se dívá
-        if (dashDirectionX == 0)
-        {
-            dashDirectionX = Mathf.Sign(transform.localScale.x);
-        }
-
-        // dash nahoru nejde
         Vector2 dashDir = new Vector2(dashDirectionX, 0);
-
         body.velocity = dashDir.normalized * dashingPower;
 
-        // trail on
         if (tr != null) tr.emitting = true;
-
         yield return new WaitForSeconds(dashingTime);
-
-        // trail off
         if (tr != null) tr.emitting = false;
 
         body.gravityScale = originalGravity;
@@ -193,17 +278,14 @@ public class PlayerMovement : MonoBehaviour
         return raycastHit.collider != null;
     }
 
-
     public bool canAttack()
     {
-        return horizontalInput == 0 && isGrounded() && !onWall();
+        // zákaz útoku v kulièce
+        return horizontalInput == 0 && isGrounded() && !onWall() && !isRolling;
     }
-
-    // --- NOVÉ FUNKCE PRO ONE WAY PLATFORM ---
 
     private void OnCollisionEnter2D(Collision2D collision)
     {
-        // Kontrola, jestli jsme stoupli na vrstvu OneWayPlatform
         if (isInLayerMask(collision.gameObject.layer, oneWayPlatformLayer))
         {
             currentOneWayPlatform = collision.gameObject;
@@ -212,7 +294,6 @@ public class PlayerMovement : MonoBehaviour
 
     private void OnCollisionExit2D(Collision2D collision)
     {
-        // Kontrola, jestli jsme odešli z vrstvy OneWayPlatform
         if (isInLayerMask(collision.gameObject.layer, oneWayPlatformLayer))
         {
             currentOneWayPlatform = null;
@@ -222,18 +303,11 @@ public class PlayerMovement : MonoBehaviour
     private IEnumerator DisableCollision()
     {
         BoxCollider2D platformCollider = currentOneWayPlatform.GetComponent<BoxCollider2D>();
-
-        // Vypneme kolizi mezi hráèem a plošinou
         Physics2D.IgnoreCollision(boxCollider, platformCollider);
-
-        // Èekáme, než propadne
         yield return new WaitForSeconds(0.5f);
-
-        // Zapneme kolizi zpátky
         Physics2D.IgnoreCollision(boxCollider, platformCollider, false);
     }
 
-    // Pomocná funkce pro zjištìní, jestli je layer souèástí LayerMasky
     private bool isInLayerMask(int layer, LayerMask mask)
     {
         return (mask == (mask | (1 << layer)));

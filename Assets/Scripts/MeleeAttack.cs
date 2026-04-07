@@ -8,6 +8,9 @@ public class PlayerCombat : MonoBehaviour
     public Animator animator;
     public Transform attackPoint;
 
+    // --- NOVÉ: Reference na pohyb, abychom vìdìli, jestli jsme kulièka ---
+    private PlayerMovement playerMovement;
+
     [Header("Stats")]
     public float attackRange = 0.5f;
     public int attackDamage = 1;
@@ -17,10 +20,19 @@ public class PlayerCombat : MonoBehaviour
     [Header("Targets")]
     public LayerMask enemyLayers;
 
+    void Start()
+    {
+        // Najdeme si skript s pohybem
+        playerMovement = GetComponent<PlayerMovement>();
+    }
+
     void Update()
     {
         if (Time.time >= nextAttackTime)
         {
+            // --- ZMÌNA: POKUD JSI KULIÈKA, ZRUŠ ÚTOK ---
+            if (playerMovement != null && playerMovement.isRolling) return;
+
             // Tady už NEREŠÍME zásah, jen spustíme vizuál
             if (Input.GetKeyDown(KeyCode.Mouse0) || Input.GetKeyDown(KeyCode.X))
             {
@@ -31,7 +43,6 @@ public class PlayerCombat : MonoBehaviour
     }
 
     // TUTO funkci zavolá až samotná animace v pøesný moment!
-    // Musí být PUBLIC, aby ji Event vidìl.
     public void DealDamage()
     {
         Collider2D[] hitObjects = Physics2D.OverlapCircleAll(attackPoint.position, attackRange, enemyLayers);
@@ -49,7 +60,6 @@ public class PlayerCombat : MonoBehaviour
             EnemyHealth enemy = obj.GetComponent<EnemyHealth>();
             if (enemy != null)
             {
-                // ZMÌNA: Posíláme 'transform' (sebe) jako druhý parametr!
                 enemy.TakeDamage(attackDamage, transform);
             }
         }

@@ -14,7 +14,6 @@ public class EnemyPatrol : MonoBehaviour
     public Transform wallCheck;   // Bod pøed oblièejem (hlídá zeï)
     public float detectionDistance = 0.5f;
 
-    // Tady vyber "Ground" (a pøípadnì "Hazard", pokud se má otáèet i pøed hroty)
     public LayerMask terrainLayer;
 
     void Start()
@@ -25,19 +24,16 @@ public class EnemyPatrol : MonoBehaviour
 
     void Update()
     {
-        // 1. POHYB: Posíláme ho dopøedu aktuálním smìrem
-        // Používáme transform.right, který se otáèí s objektem
+        //POHYB Posíláme ho dopøedu aktuálním smìrem
         transform.Translate(Vector2.right * speed * Time.deltaTime);
 
-        // 2. DETEKCE: Kdy se otoèit?
-        // Raycast dolù (je tam podlaha?)
+        // kdy se otoèit?
+        // raycast dolù (je tam podlaha?)
         bool groundInfo = Physics2D.Raycast(groundCheck.position, Vector2.down, detectionDistance, terrainLayer);
 
-        // Raycast dopøedu (je tam zeï?)
-        // Používáme 'transform.right' aby paprsek šel vždy tam, kam kouká nepøítel
+        // raycast dopøedu (je tam zeï?)
         bool wallInfo = Physics2D.Raycast(wallCheck.position, transform.right, detectionDistance, terrainLayer);
 
-        // LOGIKA: Pokud NENÍ zemì (díra) NEBO JE zeï -> Otoè se
         if (groundInfo == false || wallInfo == true)
         {
             Flip();
@@ -46,15 +42,14 @@ public class EnemyPatrol : MonoBehaviour
 
     void Flip()
     {
-        // Otoèíme logický smìr (jen pro jistotu)
+        // otoèíme logický smìr 
         movingRight = !movingRight;
 
-        // Otoèíme celý objekt o 180 stupòù
-        // Tím se otoèí i grafika, i 'transform.right', i detektory
+
         transform.Rotate(0f, 180f, 0f);
     }
 
-    // Pomocné èáry v editoru
+    // pomocné èáry v editoru
     private void OnDrawGizmos()
     {
         if (groundCheck != null)
@@ -65,7 +60,7 @@ public class EnemyPatrol : MonoBehaviour
         if (wallCheck != null)
         {
             Gizmos.color = Color.yellow;
-            // Kreslíme èáru smìrem, kam kouká objekt
+            // kreslíme èáru smìrem, kam kouká objekt
             Gizmos.DrawLine(wallCheck.position, wallCheck.position + transform.right * detectionDistance);
         }
     }

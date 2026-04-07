@@ -1,6 +1,8 @@
 using System.Collections;
 using System.Collections.Generic;
+using TMPro;
 using UnityEngine;
+using UnityEngine.UI;
 using UnityEngine.SceneManagement;
 
 public class UIManager : MonoBehaviour
@@ -14,6 +16,11 @@ public class UIManager : MonoBehaviour
 
     [Header("Main Menu")]
     [SerializeField] private GameObject mainMenu;
+
+    [Header("Unlock Notifications")]
+    public GameObject unlockPopup; // Celý objekt, který se zapíná/vypíná
+    public Image unlockImageComponent;
+
     private void Awake()
     {
         gameOverScreen.SetActive(false);
@@ -62,6 +69,29 @@ public class UIManager : MonoBehaviour
     //------------------------
     #endregion
 
+
+
+    // Upravili jsme funkci tak, aby pøijímala (string novyText)
+    public void ShowUnlockSprite(Sprite novySprite)
+    {
+        if (unlockPopup != null && unlockImageComponent != null)
+        {
+            // Pøepíšeme obrázek v UI na ten, co nám poslal Item
+            unlockImageComponent.sprite = novySprite;
+
+            // Nastavíme originální velikost obrázku (aby nebyl deformovaný)
+            //unlockImageComponent.SetNativeSize();
+
+            StartCoroutine(UnlockRoutine());
+        }
+    }
+
+    private System.Collections.IEnumerator UnlockRoutine()
+    {
+        unlockPopup.SetActive(true);
+        yield return new WaitForSeconds(3.5f);
+        unlockPopup.SetActive(false);
+    }
     #region Pause
 
     public void PauseGame(bool status)
